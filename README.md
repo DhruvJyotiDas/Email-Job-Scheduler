@@ -319,6 +319,8 @@ from a 24 h Redis cache · per-user daily budget · the spam checker is local an
 
 ## 🧪 Testing
 
+Demo data and the 5-minute video script live in [docs/DEMO.md](docs/DEMO.md) (`npm run demo -- you@gmail.com`).
+
 ```bash
 npm run typecheck          # all workspaces
 npm test                   # shared unit tests + limiter tests (limiter tests need Redis)

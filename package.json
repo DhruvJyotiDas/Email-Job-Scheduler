@@ -17,6 +17,7 @@
     "prisma:generate": "prisma generate --schema backend/prisma/schema.prisma",
     "prisma:migrate": "prisma migrate dev --schema backend/prisma/schema.prisma",
     "seed": "tsx backend/prisma/seed.ts",
+    "demo": "tsx backend/prisma/demo.ts",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write ."
   },
