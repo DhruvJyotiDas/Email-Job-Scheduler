@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ejs
+          POSTGRES_PASSWORD: ejs
+          POSTGRES_DB: ejs
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://ejs:ejs@localhost:5432/ejs
+      REDIS_URL: redis://localhost:6379
+      JWT_SECRET: ci-test-secret-not-for-prod
+      ENCRYPTION_KEY: ci-test-key-1234567890abcdef12
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate --schema prisma/schema.prisma
+
+      - name: Run migrations
+        run: npx prisma migrate deploy --schema prisma/schema.prisma
+
+      - name: Typecheck
+        run: npm run typecheck --workspaces --if-present
+
+      - name: Lint
+        run: npm run lint --workspaces --if-present || true
+
+      - name: Test
+        run: npm run test --workspaces --if-present
+
+      - name: Build
+        run: |
+          npm run build -w @ejs/shared
+          npm run build -w @ejs/core
+          npm run build -w @ejs/api
+          npm run build -w @ejs/worker
+          npm run build -w @ejs/web

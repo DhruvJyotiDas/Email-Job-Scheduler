@@ -3,6 +3,14 @@ import { QUEUE_NAME, SendEmailJobData } from '@ejs/shared';
 import { config, createRedis, ensureIndex, logger, prisma, redis } from '@ejs/core';
 import { processEmail } from './processor';
 
+async function runRetention() {
+  const cutoff = new Date(Date.now() - config.retentionDays * 86400_000);
+  const { count } = await prisma.email.deleteMany({
+    where: { status: { in: ['sent', 'failed', 'suppressed'] }, sentAt: { lt: cutoff } },
+  });
+  if (count > 0) logger.info({ count, cutoffDays: config.retentionDays }, 'retention: deleted old emails');
+}
+
 async function main() {
   await ensureIndex().catch((err) => logger.warn({ err }, 'ES not ready; search indexing will retry per email'));
 
@@ -16,7 +24,10 @@ async function main() {
   worker.on('error', (err) => logger.error({ err }, 'worker error'));
   logger.info({ concurrency: config.workerConcurrency }, 'worker started');
 
-  // Graceful shutdown: stop taking new jobs, let in-flight ones finish, then close connections.
+  // Run retention once on startup, then every 24h.
+  void runRetention().catch((err) => logger.warn({ err }, 'retention run failed'));
+  setInterval(() => void runRetention().catch((err) => logger.warn({ err }, 'retention run failed')), 86400_000);
+
   let closing = false;
   const shutdown = async (sig: string) => {
     if (closing) return;

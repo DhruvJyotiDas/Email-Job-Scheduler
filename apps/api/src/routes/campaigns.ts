@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { createHash } from 'crypto';
 import { createCampaignSchema, idempotencyKey } from '@ejs/shared';
-import { emailQueue, indexEmail, prisma } from '@ejs/core';
+import { config, emailQueue, indexEmail, prisma, redis } from '@ejs/core';
 import { uid } from '../auth';
 
 export const campaignsRouter = Router();
@@ -23,6 +23,13 @@ campaignsRouter.post('/', async (req, res) => {
 
   const existing = await prisma.campaign.findUnique({ where: { id }, include: { _count: { select: { emails: true } } } });
   if (existing) return void res.status(200).json({ id, total: existing._count.emails, duplicate: true });
+
+  // Per-user daily enqueue quota — prevents one account from flooding the queue.
+  const quotaKey = `quota:${userId}:${new Date().toISOString().slice(0, 10)}`;
+  const current = Number((await redis.get(quotaKey)) ?? 0);
+  if (current + body.recipients.length > config.dailyEmailLimitPerUser) {
+    return void res.status(429).json({ error: 'daily_quota_exceeded', limit: config.dailyEmailLimitPerUser });
+  }
 
   const startAt = new Date(body.startAt);
   // De-dupe recipients inside the request too.
@@ -53,13 +60,17 @@ campaignsRouter.post('/', async (req, res) => {
   ]);
 
   const created = await prisma.email.findMany({ where: { campaignId: id }, select: { id: true, idempotencyKey: true, scheduledAt: true } });
+  const requestId = (req as any).id as string | undefined;
   await emailQueue.addBulk(
     created.map((e) => ({
       name: 'send-email',
-      data: { emailId: e.id },
+      data: { emailId: e.id, requestId },
       opts: { jobId: e.idempotencyKey, delay: Math.max(0, e.scheduledAt.getTime() - Date.now()) },
     })),
   );
+  // Increment quota counter; 2-day TTL covers the boundary between days.
+  await redis.incrby(quotaKey, recipients.length);
+  await redis.expire(quotaKey, 86400 * 2);
   void Promise.all(created.map((e) => indexEmail(e.id)));
 
   res.status(201).json({ id, total: created.length, duplicate: false });

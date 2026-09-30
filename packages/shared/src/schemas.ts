@@ -13,7 +13,7 @@ export const createCampaignSchema = z.object({
   senderId: z.string().optional(), // omitted => rotate across all active senders
   recipients: z.array(recipientSchema).min(1).max(20000),
   subject: z.string().min(1).max(300),
-  body: z.string().min(1),
+  body: z.string().min(1).max(200_000),
   startAt: z.string().datetime(), // ISO UTC
   delayMs: z.number().int().min(0).max(3_600_000).default(2000),
   hourlyLimit: z.number().int().min(1).max(100000).default(200),
@@ -22,6 +22,7 @@ export type CreateCampaignInput = z.infer<typeof createCampaignSchema>;
 
 export interface SendEmailJobData {
   emailId: string;
+  requestId?: string;
 }
 
 export const QUEUE_NAME = 'email-send';

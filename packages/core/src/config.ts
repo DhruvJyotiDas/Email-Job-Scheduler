@@ -27,4 +27,7 @@ export const config = {
   maxEmailsPerHourPerSender: num('MAX_EMAILS_PER_HOUR_PER_SENDER', 200),
   minDelayBetweenSendsMs: num('MIN_DELAY_BETWEEN_SENDS_MS', 2000),
   bullBoard: { user: process.env.BULL_BOARD_USER ?? 'admin', pass: process.env.BULL_BOARD_PASS ?? 'admin' },
+  dailyEmailLimitPerUser: num('DAILY_EMAIL_LIMIT_PER_USER', 50_000),
+  retentionDays: num('EMAIL_RETENTION_DAYS', 90),
+  otlpEndpoint: process.env.OTEL_EXPORTER_OTLP_ENDPOINT ?? '',
 };

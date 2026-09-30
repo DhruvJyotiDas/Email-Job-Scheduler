@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import type { Sender } from '@prisma/client';
 import { currentUsage, emailQueue, prisma, redis } from '@ejs/core';
 import { uid } from '../auth';
 
@@ -23,8 +24,8 @@ statsRouter.get('/', async (req, res) => {
     if (buckets.has(k)) buckets.set(k, buckets.get(k)! + 1);
   }
 
-  const total = groups.reduce((a, g) => a + g._count, 0);
-  const by = Object.fromEntries(groups.map((g) => [g.status, g._count]));
+  const total = groups.reduce((a: number, g: { status: string; _count: number }) => a + g._count, 0);
+  const by = Object.fromEntries(groups.map((g: { status: string; _count: number }) => [g.status, g._count]));
   const done = (by.sent ?? 0) + (by.failed ?? 0);
 
   res.json({
@@ -34,7 +35,7 @@ statsRouter.get('/', async (req, res) => {
     successRate: done ? Math.round(((by.sent ?? 0) / done) * 1000) / 10 : null,
     perHour: [...buckets].map(([hour, count]) => ({ hour, count })),
     senders: await Promise.all(
-      senders.map(async (s) => ({ email: s.email, used: await currentUsage(redis, s.id), limit: s.hourlyLimit })),
+      senders.map(async (s: Sender) => ({ email: s.email, used: await currentUsage(redis, s.id), limit: s.hourlyLimit })),
     ),
   });
 });

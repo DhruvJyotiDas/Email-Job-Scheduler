@@ -30,7 +30,7 @@ async function setStatus(emailId: string, data: Parameters<typeof prisma.email.u
 }
 
 export async function processEmail(job: Job<SendEmailJobData>, token?: string): Promise<void> {
-  const log = logger.child({ jobId: job.id, emailId: job.data.emailId });
+  const log = logger.child({ jobId: job.id, emailId: job.data.emailId, requestId: job.data.requestId });
   const email = await prisma.email.findUnique({ where: { id: job.data.emailId }, include: { campaign: true } });
   if (!email) return log.warn('email row missing, dropping job');
 

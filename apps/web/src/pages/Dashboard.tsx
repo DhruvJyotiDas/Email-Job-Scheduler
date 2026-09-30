@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Clock, Filter, RefreshCw, Search, Star } from 'lucide-react';
+import DOMPurify from 'dompurify';
 import { api, EmailRow } from '../lib/api';
 
 const fmtTime = (iso: string) =>
@@ -84,11 +85,11 @@ export default function Dashboard({ tab }: { tab: 'scheduled' | 'sent' }) {
               onClick={() => nav(`/email/${e.id}`)}
               className="flex cursor-pointer items-center gap-3 border-b border-line px-4 py-2.5 hover:bg-field/60"
             >
-              <span className="w-[170px] shrink-0 truncate text-xs" dangerouslySetInnerHTML={{ __html: `To: ${e.highlight?.recipient?.[0] ?? esc(e.recipient)}` }} />
+              <span className="w-[170px] shrink-0 truncate text-xs" dangerouslySetInnerHTML={{ __html: `To: ${e.highlight?.recipient?.[0] ? sanitizeHighlight(e.highlight.recipient[0]) : esc(e.recipient)}` }} />
               <Badge e={e} />
               <span className="min-w-0 flex-1 truncate text-xs">
-                <b className="font-semibold" dangerouslySetInnerHTML={{ __html: e.highlight?.subject?.[0] ?? esc(e.subject) }} />
-                <span className="text-ink-muted"> - <span dangerouslySetInnerHTML={{ __html: e.highlight?.body?.[0] ? stripTags(e.highlight.body[0]) : esc(e.preview) }} /></span>
+                <b className="font-semibold" dangerouslySetInnerHTML={{ __html: e.highlight?.subject?.[0] ? sanitizeHighlight(e.highlight.subject[0]) : esc(e.subject) }} />
+                <span className="text-ink-muted"> - <span dangerouslySetInnerHTML={{ __html: e.highlight?.body?.[0] ? sanitizeHighlight(e.highlight.body[0]) : esc(e.preview) }} /></span>
               </span>
               <button
                 onClick={(ev) => { ev.stopPropagation(); star.mutate(e.id); }}
@@ -104,6 +105,6 @@ export default function Dashboard({ tab }: { tab: 'scheduled' | 'sent' }) {
   );
 }
 
-const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
-/** ES highlights are already HTML-encoded (server uses encoder: html); drop any tags except <mark>. */
-const stripTags = (s: string) => s.replace(/<(?!\/?mark>)[^>]*>/g, '');
+const esc = (s: string) => DOMPurify.sanitize(s, { ALLOWED_TAGS: [] });
+/** Sanitize ES highlight snippets — allow only <mark> for bolding, strip everything else. */
+const sanitizeHighlight = (s: string) => DOMPurify.sanitize(s, { ALLOWED_TAGS: ['mark'], ALLOWED_ATTR: [] });
