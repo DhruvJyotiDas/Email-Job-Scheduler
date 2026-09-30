@@ -26,8 +26,8 @@ const fmtTime = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit', second: '2-digit' });
 
 function Badge({ e }: { e: EmailRow }) {
-  if (e.status === 'sent') return <span className="shrink-0 rounded-md bg-field px-2 py-0.5 text-[11px]">Sent</span>;
-  if (e.status === 'failed') return <span className="shrink-0 rounded-md bg-red-100 px-2 py-0.5 text-[11px] text-red-700" title={e.error ?? ''}>Failed</span>;
+  if (e.status === 'sent') return <span className="shrink-0 rounded-md bg-field px-2 py-0.5 text-[11px]">Sent · {fmtTime(e.sentAt ?? e.scheduledAt)}</span>;
+  if (e.status === 'failed') return <span className="shrink-0 rounded-md bg-red-100 px-2 py-0.5 text-[11px] text-red-700" title={e.error ?? ''}>Failed · {fmtTime(e.sentAt ?? e.scheduledAt)}</span>;
   if (e.status === 'suppressed') return <span className="shrink-0 rounded-md bg-field px-2 py-0.5 text-[11px]">Suppressed</span>;
   const label = e.status === 'sending' ? 'Sending…' : e.status === 'delayed_ratelimit' ? `Rate-limited · ${fmtTime(e.scheduledAt)}` : fmtTime(e.scheduledAt);
   return (

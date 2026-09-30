@@ -1,8 +1,12 @@
 <div align="center">
 
+<img src="docs/screenshots/banner.png" alt="Outbox Labs" width="100%" />
+
 # 📬 ONB · Email Job Scheduler
 
 **Schedule emails and CSV campaigns that survive restarts, respect per-sender hourly limits, and never send twice.**
+
+Made by **[Dhruv Jyoti Das](https://github.com/DhruvJyotiDas)** · Built for the ReachInbox / Outbox Labs full-stack assignment
 
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-000000?logo=express&logoColor=white)
@@ -14,11 +18,21 @@
 ![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white)
 ![Tailwind](https://img.shields.io/badge/Tailwind-06B6D4?logo=tailwindcss&logoColor=white)
 
-[Highlights](#-highlights) · [Architecture](#-architecture) · [Quick start](#-quick-start) · [Features](#-features-implemented) · [Configuration](#%EF%B8%8F-configuration) · [Structure](#-project-structure) · [Testing](#-testing)
+[Screenshots](#-screenshots) · [Highlights](#-highlights) · [Architecture](#-architecture) · [Quick start](#-quick-start) · [Features](#-features-implemented) · [Configuration](#%EF%B8%8F-configuration) · [Structure](#-project-structure) · [Testing](#-testing)
 
 </div>
 
 ---
+
+## 📸 Screenshots
+
+| Login | Scheduled emails |
+|---|---|
+| <img src="docs/screenshots/login.png" alt="Login" /> | <img src="docs/screenshots/dashboard.png" alt="Dashboard" /> |
+
+**Compose** (CSV upload, delay, hourly limit, AI draft)
+
+<img src="docs/screenshots/compose.png" alt="Compose new email" width="720" />
 
 ## ✨ Highlights
 
@@ -248,6 +262,18 @@ See [render.yaml](render.yaml): one Postgres, one Redis (`noeviction`), an API w
 
 **AI cost controls:** calls happen only on an explicit click · output capped at 350 tokens · identical prompts are served
 from a 24 h Redis cache · per-user daily budget · the spam checker is local and free.
+
+## ⚖️ Assumptions and trade-offs
+
+- **Delivery semantics:** exactly-once in normal operation. A crash *between* SMTP accept and the DB write can re-send one email (at-least-once in that narrow window). Closing it fully would need two-phase commit with the SMTP server.
+- **Hourly windows** are fixed clock hours (UTC). Over-limit jobs move to the next hour window with a little jitter, so strict FIFO order is preserved only approximately.
+- **Rate limiting is custom** (a Redis Lua script) instead of BullMQ's limiter, because per-sender hourly windows with cross-sender failover aren't expressible there without BullMQ Pro.
+- **Elasticsearch is best-effort.** Indexing is fire-and-forget; Postgres is the source of truth and search falls back to it. Emails created before Elasticsearch was connected are not back-filled.
+- **Ethereal is a test SMTP.** Mail never reaches real inboxes; each sent email has a preview URL instead.
+- **Auth:** Google OAuth with an httpOnly cookie JWT. The email/password fields on the login screen match the Figma but are not wired; the dev-login shortcut is disabled in production.
+- **Hosting on Render:** the static site proxies `/api` and `/socket.io` to the API so the cookie session is same-origin. WebSocket upgrades through that proxy are not guaranteed, so live updates may fall back to polling.
+- **Migrations run in the build step** on Render (pre-deploy hooks are a paid feature).
+- **Not built:** email attachments, a k6 load script, production docker-compose with HTTPS.
 
 ## 🧠 Design decisions
 
