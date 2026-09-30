@@ -5,7 +5,7 @@ set -euo pipefail
 PSQL="docker compose exec -T postgres psql -U ejs -d ejs -At"
 
 echo "== before: status counts"; $PSQL -c "select status, count(*) from emails group by 1 order by 1"
-echo "== killing worker (SIGKILL, worst case)"; docker compose kill worker 2>/dev/null || pkill -9 -f "apps/worker" || true
+echo "== killing worker (SIGKILL, worst case)"; docker compose kill worker 2>/dev/null || pkill -9 -f "backend/worker" || true
 sleep 10
 echo "== restarting worker"; docker compose start worker 2>/dev/null || echo "start the worker manually: npm run dev:worker"
 sleep 20

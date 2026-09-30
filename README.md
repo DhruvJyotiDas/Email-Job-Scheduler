@@ -1,16 +1,26 @@
 <div align="center">
 
-# ONB · Email Job Scheduler
+# 📬 ONB · Email Job Scheduler
 
 **Schedule emails and CSV campaigns that survive restarts, respect per-sender hourly limits, and never send twice.**
 
-TypeScript · Express · BullMQ · Redis · PostgreSQL (Prisma) · Elasticsearch · React · Ethereal SMTP
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?logo=typescript&logoColor=white)
+![Express](https://img.shields.io/badge/Express-000000?logo=express&logoColor=white)
+![BullMQ](https://img.shields.io/badge/BullMQ-DC382D?logo=redis&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white)
+![Prisma](https://img.shields.io/badge/Prisma-2D3748?logo=prisma&logoColor=white)
+![Elasticsearch](https://img.shields.io/badge/Elasticsearch-005571?logo=elasticsearch&logoColor=white)
+![React](https://img.shields.io/badge/React-20232A?logo=react&logoColor=61DAFB)
+![Vite](https://img.shields.io/badge/Vite-646CFF?logo=vite&logoColor=white)
+![Tailwind](https://img.shields.io/badge/Tailwind-06B6D4?logo=tailwindcss&logoColor=white)
+
+[Highlights](#-highlights) · [Architecture](#-architecture) · [Quick start](#-quick-start) · [Configuration](#%EF%B8%8F-configuration) · [Structure](#-project-structure) · [Testing](#-testing)
 
 </div>
 
 ---
 
-## Highlights
+## ✨ Highlights
 
 | | Feature | How |
 |---|---|---|
@@ -30,7 +40,7 @@ TypeScript · Express · BullMQ · Redis · PostgreSQL (Prisma) · Elasticsearch
 | 🕐 | **Timezone-aware** | *Send Later* uses your browser timezone; stored as UTC. |
 | 🧰 | **Ops** | Bull Board (`/admin/queues`), Swagger (`/api/docs`), structured pino logs. |
 
-## Architecture
+## 🏗 Architecture
 
 ```mermaid
 flowchart LR
@@ -51,7 +61,7 @@ flowchart LR
 CAS `scheduled → sending` → render (spintax + variables) → SMTP → `sent` → index + publish.
 If no sender has headroom: `moveToDelayed(next window)` and alert Slack once.
 
-## Quick start
+## 🚀 Quick start
 
 ```bash
 cp .env.example .env               # add GOOGLE_*/SLACK_*/GEMINI_API_KEY as needed
@@ -69,7 +79,7 @@ npm run dev:web                    # http://localhost:5173
 In development, the **Login** button signs in as a demo user when Google isn't configured
 (`/api/auth/dev-login`, automatically disabled in production).
 
-## Configuration
+## ⚙️ Configuration
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -86,7 +96,7 @@ In development, the **Login** button signs in as a demo user when Google isn't c
 **AI cost controls:** calls happen only on an explicit click · output capped at 350 tokens · identical prompts are served
 from a 24 h Redis cache · per-user daily budget · the spam checker is local and free.
 
-## Design decisions
+## 🧠 Design decisions
 
 - **Why a Lua script, not BullMQ's limiter?** Per-group limiting is BullMQ Pro, and it can't express per-sender *hourly windows*
   with cross-sender failover. The script checks quota and min-gap and reserves atomically, so concurrent workers can't oversubscribe.
@@ -97,30 +107,38 @@ from a 24 h Redis cache · per-user daily budget · the spam checker is local an
 - **ES is best-effort.** Indexing is fire-and-forget with short timeouts; Postgres is the source of truth and search falls back to it.
 - **Secrets at rest.** SMTP passwords and Slack tokens are AES-256-GCM encrypted; user HTML is rendered in a sandboxed iframe.
 
-## Project structure
+## 🗂 Project structure
 
 ```
 .
-├── apps/
-│   ├── api/                 Express API · auth · Bull Board · Swagger · socket.io
+├── frontend/                React + Vite + Tailwind + TipTap  (@ejs/web)
+│   └── src/
+│       ├── pages/           Login · Dashboard · Compose · EmailDetail · Senders · Analytics
+│       ├── components/      Layout and shared UI
+│       └── lib/             api client · auth · toasts · live email events
+│
+├── backend/
+│   ├── api/                 Express API · auth · Bull Board · Swagger · socket.io  (@ejs/api)
 │   │   └── src/routes/      campaigns · emails · senders · slack · ai · stats
-│   ├── worker/              BullMQ worker
+│   ├── worker/              BullMQ worker  (@ejs/worker)
 │   │   └── src/             processor.ts (limiter, rotation, CAS, SMTP) · mailer.ts
-│   └── web/                 React + Vite + Tailwind + TipTap
-│       └── src/             pages/ (Login, Dashboard, Compose, EmailDetail, Senders, Analytics) · components/ · lib/
+│   ├── core/                prisma · redis · queue · Lua rate limiter · Elasticsearch · Slack · crypto  (@ejs/core)
+│   └── prisma/              schema.prisma · migrations · seed.ts
+│
 ├── packages/
-│   ├── shared/              zod schemas · spintax/variables · spam linter · time + idempotency helpers
-│   └── core/                prisma · redis · queue · Lua rate limiter · Elasticsearch · Slack · crypto
-├── prisma/                  schema.prisma · migrations · seed.ts
+│   └── shared/              zod schemas · spintax/variables · spam linter · time + idempotency helpers
+│                            (used by both frontend and backend)
+│
 ├── scripts/                 chaos.sh (kill/restart drill)
 ├── docs/
 │   ├── PLAN.md              product + engineering plan
 │   └── design/              Figma screenshots the UI is built against
 ├── docker-compose.yml       postgres · redis (AOF) · elasticsearch
+├── render.yaml              Render blueprint
 └── .env.example
 ```
 
-## Testing
+## 🧪 Testing
 
 ```bash
 npm run typecheck          # all workspaces
@@ -130,7 +148,7 @@ bash scripts/chaos.sh      # kill worker mid-campaign, restart, assert zero dupl
 
 The limiter test fires 50 concurrent reservations at real Redis and asserts exactly `limit` are granted.
 
-## Status
+## 📌 Status
 
 **Verified locally:** scheduling, atomic limiter, rotation, reschedule-on-cap, idempotent re-submit, crash recovery, real Ethereal sends,
 spintax/variables, Bull Board auth, Swagger, stats, AI compose (via fallback model while the primary was overloaded), search fallback.

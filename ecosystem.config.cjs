@@ -2,8 +2,8 @@ module.exports = {
   apps: [
     {
       name: 'ejs-api',
-      script: 'apps/api/dist/index.js',
-      node_args: '-r apps/api/dist/tracing.js',
+      script: 'backend/api/dist/index.js',
+      node_args: '-r backend/api/dist/tracing.js',
       cwd: '/home/ubuntu/Email-Job-Scheduler',
       exec_mode: 'fork',
       instances: 1,
@@ -14,8 +14,8 @@ module.exports = {
     },
     {
       name: 'ejs-worker',
-      script: 'apps/worker/dist/index.js',
-      node_args: '-r apps/worker/dist/tracing.js',
+      script: 'backend/worker/dist/index.js',
+      node_args: '-r backend/worker/dist/tracing.js',
       cwd: '/home/ubuntu/Email-Job-Scheduler',
       exec_mode: 'fork',
       instances: 1,

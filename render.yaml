@@ -32,9 +32,9 @@ services:
       npm run build -w @ejs/shared &&
       npm run build -w @ejs/core &&
       npm run build -w @ejs/api
-    startCommand: node apps/api/dist/index.js
+    startCommand: node backend/api/dist/index.js
     # Run Prisma migrations before each deploy (zero-downtime safe for additive migrations).
-    preDeployCommand: npx prisma migrate deploy --schema prisma/schema.prisma
+    preDeployCommand: npx prisma migrate deploy --schema backend/prisma/schema.prisma
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
@@ -114,7 +114,7 @@ services:
       npm run build -w @ejs/shared &&
       npm run build -w @ejs/core &&
       npm run build -w @ejs/worker
-    startCommand: node apps/worker/dist/index.js
+    startCommand: node backend/worker/dist/index.js
     envVars:
       - key: NODE_ENV
         value: production
@@ -159,7 +159,7 @@ services:
       npm ci &&
       npm run build -w @ejs/shared &&
       npm run build -w @ejs/web
-    staticPublishPath: apps/web/dist
+    staticPublishPath: frontend/dist
     routes:
       # Catch-all — serve index.html for every non-asset path (client-side routing).
       - type: rewrite

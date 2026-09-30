@@ -2,7 +2,7 @@ import path from 'path';
 import dotenv from 'dotenv';
 
 // Load the repo-root .env regardless of which workspace is the cwd.
-dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
 
 const num = (k: string, d: number) => (process.env[k] ? Number(process.env[k]) : d);
 

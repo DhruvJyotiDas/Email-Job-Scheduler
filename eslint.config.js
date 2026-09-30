@@ -4,7 +4,7 @@ import prettier from 'eslint-config-prettier';
 
 /** @type {import('eslint').Linter.FlatConfig[]} */
 export default [
-  { ignores: ['**/dist/**', '**/node_modules/**', 'prisma/migrations/**'] },
+  { ignores: ['**/dist/**', '**/node_modules/**', 'backend/prisma/migrations/**'] },
   {
     files: ['**/*.ts', '**/*.tsx'],
     languageOptions: { parser: tsparser, parserOptions: { project: true } },
