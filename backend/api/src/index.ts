@@ -40,6 +40,7 @@ const redis = createRedis();
 const sub = createRedis();
 
 const app = express();
+app.set('trust proxy', 1); // behind Render's proxy: real client IP for rate limiting
 
 app.use(helmet({ contentSecurityPolicy: false })); // CSP managed by nginx
 app.use(cors({ origin: config.webUrl, credentials: true }));
@@ -48,7 +49,13 @@ app.use(cookieParser());
 app.use(pinoHttp({ logger, genReqId: (req) => (req.headers['x-request-id'] as string) ?? randomUUID() }));
 
 // Strict rate limit on auth endpoints to slow credential stuffing.
-const authLimiter = rateLimit({ windowMs: 15 * 60_000, max: 20, standardHeaders: true, legacyHeaders: false });
+const authLimiter = rateLimit({
+  windowMs: 15 * 60_000,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.path === '/me', // session check runs on every page load
+});
 // General API limit — generous enough for normal use, blocks runaway clients.
 const apiLimiter = rateLimit({ windowMs: 60_000, max: 200, standardHeaders: true, legacyHeaders: false });
 
