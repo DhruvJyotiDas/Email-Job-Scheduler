@@ -1,0 +1,190 @@
+# Render Blueprint — Email Job Scheduler
+# https://render.com/docs/blueprint-spec
+#
+# Infrastructure overview:
+#   ejs-api     — Express API (web service, port 4000)
+#   ejs-worker  — BullMQ background worker
+#   ejs-web     — Vite/React SPA (static site, base /scheduler/)
+#   ejs-postgres — Managed PostgreSQL 16
+#   ejs-redis   — Managed Redis 7
+#
+# Elasticsearch is NOT available as a managed Render service.
+# Provision it externally (Elastic Cloud, Bonsai.io, etc.) and set
+# the ELASTICSEARCH_URL env var on both ejs-api and ejs-worker.
+#
+# After first deploy, set these env vars manually in the Render dashboard:
+#   ejs-api:    WEB_URL, JWT_SECRET, ENCRYPTION_KEY,
+#               GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET,
+#               SLACK_CLIENT_ID, SLACK_CLIENT_SECRET,
+#               ELASTICSEARCH_URL
+#   ejs-worker: ELASTICSEARCH_URL
+#   ejs-web:    (no manual vars required — API calls proxied via routes below)
+
+services:
+  # ── API ────────────────────────────────────────────────────────────────────
+  - type: web
+    name: ejs-api
+    runtime: node
+    region: oregon
+    plan: starter
+    buildCommand: >-
+      npm ci &&
+      npm run build -w @ejs/shared &&
+      npm run build -w @ejs/core &&
+      npm run build -w @ejs/api
+    startCommand: node apps/api/dist/index.js
+    # Run Prisma migrations before each deploy (zero-downtime safe for additive migrations).
+    preDeployCommand: npx prisma migrate deploy --schema prisma/schema.prisma
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 4000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ejs-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: ejs-redis
+          property: connectionString
+      # Set WEB_URL to your deployed static site URL after first deploy.
+      - key: WEB_URL
+        sync: false
+      # Set API_URL to this service's URL after first deploy.
+      - key: API_URL
+        sync: false
+      # Generate a strong random secret or paste your own.
+      - key: JWT_SECRET
+        generateValue: true
+      # Must be exactly 32 hex characters (128-bit key).
+      - key: ENCRYPTION_KEY
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: SLACK_CLIENT_ID
+        sync: false
+      - key: SLACK_CLIENT_SECRET
+        sync: false
+      # External Elasticsearch — required for search features.
+      - key: ELASTICSEARCH_URL
+        sync: false
+      - key: BULL_BOARD_USER
+        value: admin
+      - key: BULL_BOARD_PASS
+        generateValue: true
+      - key: WORKER_CONCURRENCY
+        value: 5
+      - key: MAX_EMAILS_PER_HOUR_PER_SENDER
+        value: 200
+      - key: MIN_DELAY_BETWEEN_SENDS_MS
+        value: 2000
+      - key: DAILY_EMAIL_LIMIT_PER_USER
+        value: 50000
+      - key: EMAIL_RETENTION_DAYS
+        value: 90
+      - key: AI_DAILY_LIMIT_PER_USER
+        value: 20
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash
+      - key: GEMINI_FALLBACK_MODEL
+        value: gemini-3.1-flash-lite
+      # SigNoz / OpenTelemetry — leave blank to disable tracing.
+      - key: OTEL_EXPORTER_OTLP_ENDPOINT
+        sync: false
+      - key: SIGNOZ_ACCESS_TOKEN
+        sync: false
+      - key: LOG_LEVEL
+        value: info
+
+  # ── Worker ─────────────────────────────────────────────────────────────────
+  - type: worker
+    name: ejs-worker
+    runtime: node
+    region: oregon
+    plan: starter
+    buildCommand: >-
+      npm ci &&
+      npm run build -w @ejs/shared &&
+      npm run build -w @ejs/core &&
+      npm run build -w @ejs/worker
+    startCommand: node apps/worker/dist/index.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ejs-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: ejs-redis
+          property: connectionString
+      - key: ELASTICSEARCH_URL
+        sync: false
+      - key: WORKER_CONCURRENCY
+        value: 5
+      - key: MAX_EMAILS_PER_HOUR_PER_SENDER
+        value: 200
+      - key: MIN_DELAY_BETWEEN_SENDS_MS
+        value: 2000
+      - key: DAILY_EMAIL_LIMIT_PER_USER
+        value: 50000
+      - key: OTEL_EXPORTER_OTLP_ENDPOINT
+        sync: false
+      - key: SIGNOZ_ACCESS_TOKEN
+        sync: false
+      - key: LOG_LEVEL
+        value: info
+
+  # ── Frontend (Static Site) ─────────────────────────────────────────────────
+  - type: web
+    name: ejs-web
+    runtime: static
+    region: oregon
+    plan: starter
+    buildCommand: >-
+      npm ci &&
+      npm run build -w @ejs/shared &&
+      npm run build -w @ejs/web
+    staticPublishPath: apps/web/dist
+    # The SPA uses relative fetch('/api/...) calls.
+    # Proxy rules forward those to the API service transparently.
+    # Replace the destination hostname if you rename ejs-api or use a custom domain.
+    routes:
+      - type: proxy
+        source: /api/*
+        destination: https://ejs-api.onrender.com/api/$1
+      - type: proxy
+        source: /socket.io/*
+        destination: https://ejs-api.onrender.com/socket.io/$1
+      - type: proxy
+        source: /admin/*
+        destination: https://ejs-api.onrender.com/admin/$1
+      # Catch-all — serve index.html for every non-asset path (client-side routing).
+      - type: rewrite
+        source: /*
+        destination: /index.html
+
+  # ── Redis ──────────────────────────────────────────────────────────────────
+  - type: redis
+    name: ejs-redis
+    region: oregon
+    plan: starter
+    maxmemoryPolicy: noeviction
+    ipAllowList: []
+
+databases:
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  - name: ejs-postgres
+    databaseName: ejs
+    user: ejs
+    region: oregon
+    plan: starter
