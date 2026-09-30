@@ -1,9 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Clock, Filter, RefreshCw, Search, Star } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { api, EmailRow } from '../lib/api';
+
+const FILTERS: Record<'scheduled' | 'sent', { value: string; label: string }[]> = {
+  scheduled: [
+    { value: 'all', label: 'All' },
+    { value: 'scheduled', label: 'Scheduled' },
+    { value: 'sending', label: 'Sending' },
+    { value: 'delayed_ratelimit', label: 'Rate-limited' },
+    { value: 'starred', label: 'Starred' },
+  ],
+  sent: [
+    { value: 'all', label: 'All' },
+    { value: 'sent', label: 'Sent' },
+    { value: 'failed', label: 'Failed' },
+    { value: 'suppressed', label: 'Suppressed' },
+    { value: 'starred', label: 'Starred' },
+  ],
+};
 
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleString(undefined, { weekday: 'short', hour: 'numeric', minute: '2-digit', second: '2-digit' });
@@ -33,6 +50,15 @@ export default function Dashboard({ tab }: { tab: 'scheduled' | 'sent' }) {
   const qc = useQueryClient();
   const [q, setQ] = useState('');
   const [debounced, setDebounced] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
+  useEffect(() => setFilter('all'), [tab]);
+  useEffect(() => {
+    const close = (e: MouseEvent) => { if (!filterRef.current?.contains(e.target as Node)) setFilterOpen(false); };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, []);
   useEffect(() => {
     const t = setTimeout(() => setDebounced(q.trim()), 250);
     return () => clearTimeout(t);
@@ -45,6 +71,9 @@ export default function Dashboard({ tab }: { tab: 'scheduled' | 'sent' }) {
         ? api<EmailRow[]>(`/api/emails/search?tab=${tab}&q=${encodeURIComponent(debounced)}`)
         : api<EmailRow[]>(`/api/emails?tab=${tab}`),
   });
+
+  const rows = data?.filter((e) => filter === 'all' || (filter === 'starred' ? e.starred : e.status === filter));
+  const refresh = () => qc.invalidateQueries();
 
   const star = useMutation({
     mutationFn: (id: string) => api(`/api/emails/${id}/star`, { method: 'PATCH' }),
@@ -63,8 +92,26 @@ export default function Dashboard({ tab }: { tab: 'scheduled' | 'sent' }) {
             className="w-full rounded-full bg-field py-2 pl-8 pr-3 text-xs outline-none focus:ring-1 focus:ring-brand"
           />
         </div>
-        <Filter size={15} className="text-ink-muted" />
-        <button onClick={() => qc.invalidateQueries({ queryKey: ['emails'] })} title="Refresh">
+        <div ref={filterRef} className="relative">
+          <button onClick={() => setFilterOpen((o) => !o)} title="Filter" aria-label="Filter" className="flex items-center">
+            <Filter size={15} className={filter === 'all' ? 'text-ink-muted' : 'fill-brand text-brand'} />
+          </button>
+          {filterOpen && (
+            <ul className="absolute right-0 z-10 mt-2 w-40 rounded-lg border border-line bg-white py-1 text-xs shadow-lg">
+              {FILTERS[tab].map((f) => (
+                <li key={f.value}>
+                  <button
+                    onClick={() => { setFilter(f.value); setFilterOpen(false); }}
+                    className={`w-full px-3 py-1.5 text-left hover:bg-field ${filter === f.value ? 'font-semibold text-brand' : ''}`}
+                  >
+                    {f.label}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <button onClick={refresh} title="Refresh" aria-label="Refresh" disabled={isFetching}>
           <RefreshCw size={15} className={`text-ink-muted ${isFetching ? 'animate-spin' : ''}`} />
         </button>
       </div>
@@ -73,13 +120,13 @@ export default function Dashboard({ tab }: { tab: 'scheduled' | 'sent' }) {
         <Skeleton />
       ) : isError ? (
         <p className="p-8 text-center text-xs text-red-600">Could not load emails. Is the API running?</p>
-      ) : !data?.length ? (
+      ) : !rows?.length ? (
         <div className="p-16 text-center text-xs text-ink-muted">
-          {debounced ? `No results for “${debounced}”.` : tab === 'scheduled' ? 'No scheduled emails yet. Compose your first campaign.' : 'Nothing sent yet.'}
+          {debounced || filter !== 'all' ? 'No emails match your search or filter.' : tab === 'scheduled' ? 'No scheduled emails yet. Compose your first campaign.' : 'Nothing sent yet.'}
         </div>
       ) : (
         <ul>
-          {data.map((e) => (
+          {rows.map((e) => (
             <li
               key={e.id}
               onClick={() => nav(`/email/${e.id}`)}
