@@ -1,0 +1,21 @@
+{
+  "name": "@ejs/worker",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p .",
+    "start": "node dist/index.js",
+    "typecheck": "tsc -p . --noEmit"
+  },
+  "dependencies": {
+    "@ejs/core": "*",
+    "@ejs/shared": "*",
+    "bullmq": "^5.34.0",
+    "nodemailer": "^6.9.16"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "^6.4.17"
+  }
+}

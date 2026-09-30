@@ -1,0 +1,20 @@
+{
+  "name": "@ejs/core",
+  "version": "0.1.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p .",
+    "typecheck": "tsc -p . --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ejs/shared": "*",
+    "@elastic/elasticsearch": "^8.15.0",
+    "bullmq": "^5.34.0",
+    "dotenv": "^16.4.0",
+    "ioredis": "^5.4.0",
+    "pino": "^9.6.0"
+  },
+  "devDependencies": { "vitest": "^2.1.0" }
+}

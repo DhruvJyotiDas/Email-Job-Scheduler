@@ -1,0 +1,26 @@
+{
+  "name": "email-job-scheduler",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev:api": "npm run dev -w @ejs/api",
+    "dev:worker": "npm run dev -w @ejs/worker",
+    "dev:web": "npm run dev -w @ejs/web",
+    "build": "npm run build -w @ejs/shared && npm run build -w @ejs/api && npm run build -w @ejs/worker && npm run build -w @ejs/web",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "prisma:generate": "prisma generate --schema prisma/schema.prisma",
+    "prisma:migrate": "prisma migrate dev --schema prisma/schema.prisma",
+    "seed": "tsx prisma/seed.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "prisma": "^6.2.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.2.0"
+  }
+}

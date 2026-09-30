@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root { height: 100%; }
+body { @apply bg-white font-sans text-sm text-ink antialiased; }
+
+@layer components {
+  .input { @apply w-full rounded-lg bg-field px-3 py-2.5 text-xs outline-none placeholder:text-ink-muted focus:ring-1 focus:ring-brand; }
+  .btn-primary { @apply rounded-lg bg-brand px-4 py-2.5 text-xs font-medium text-white hover:bg-brand-dark disabled:opacity-50; }
+  .btn-outline { @apply rounded-full border border-brand px-4 py-1.5 text-xs font-medium text-brand hover:bg-brand-soft disabled:opacity-50; }
+}
+
+.ProseMirror { min-height: 260px; outline: none; padding: 12px 16px; font-size: 13px; }
+.ProseMirror p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: #8A8F8F; float: left; height: 0; pointer-events: none; }
+.ProseMirror ul { list-style: disc; padding-left: 1.25rem; }
+.ProseMirror ol { list-style: decimal; padding-left: 1.25rem; }
+.ProseMirror blockquote { border-left: 3px solid #E8EAEA; padding-left: 10px; color: #666; }
+mark { background: #FFF3B0; padding: 0 1px; border-radius: 2px; }

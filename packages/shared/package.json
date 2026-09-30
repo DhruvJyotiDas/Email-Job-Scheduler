@@ -1,0 +1,13 @@
+{
+  "name": "@ejs/shared",
+  "version": "0.1.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p .",
+    "typecheck": "tsc -p . --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": { "zod": "^3.24.0" },
+  "devDependencies": { "vitest": "^2.1.0" }
+}
