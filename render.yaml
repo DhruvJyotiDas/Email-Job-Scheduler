@@ -145,23 +145,28 @@ services:
         value: info
 
   # ── Frontend (Static Site) ─────────────────────────────────────────────────
-  # NOTE: Render static sites do NOT support proxy routes — only redirect/rewrite.
-  # The SPA currently calls relative paths (/api/...). For production, two options:
-  #   A) Add VITE_API_URL support to the frontend and prefix all fetch() calls with it.
-  #   B) Serve the built frontend from the Express API server (add express.static in index.ts).
-  # Until then, the SPA works correctly when the static site and API share a custom domain
-  # with a reverse proxy in front, or when deployed behind Render's upcoming proxy feature.
+  # The SPA calls relative paths (/api, /socket.io) and uses a cookie session, so the
+  # static site proxies those paths to the API via rewrite rules (same-origin => cookies work).
+  # After creating ejs-api, replace ejs-api.onrender.com below with its real URL if it differs.
   - type: web
     name: ejs-web
     runtime: static
-    plan: starter
     buildCommand: >-
       npm ci &&
       npm run build -w @ejs/shared &&
       npm run build -w @ejs/web
     staticPublishPath: frontend/dist
+    envVars:
+      - key: VITE_BASE
+        value: /
     routes:
-      # Catch-all — serve index.html for every non-asset path (client-side routing).
+      - type: rewrite
+        source: /api/*
+        destination: https://ejs-api.onrender.com/api/*
+      - type: rewrite
+        source: /socket.io/*
+        destination: https://ejs-api.onrender.com/socket.io/*
+      # Catch-all — serve index.html for client-side routing.
       - type: rewrite
         source: /*
         destination: /index.html
