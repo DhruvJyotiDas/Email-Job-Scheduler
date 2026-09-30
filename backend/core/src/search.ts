@@ -4,7 +4,12 @@ import { prisma } from './db';
 import { logger } from './logger';
 
 // Short timeouts: an ES outage must never stall the send path.
-export const es = new Client({ node: config.esUrl, requestTimeout: 3000, maxRetries: 1 });
+export const es = new Client({
+  node: config.esUrl,
+  ...(config.esApiKey ? { auth: { apiKey: config.esApiKey } } : {}),
+  requestTimeout: 3000,
+  maxRetries: 1,
+});
 export const EMAIL_INDEX = 'emails';
 
 export async function ensureIndex() {

@@ -13,6 +13,7 @@ export const config = {
   apiUrl: process.env.API_URL ?? 'http://localhost:4000',
   redisUrl: process.env.REDIS_URL ?? 'redis://localhost:6379',
   esUrl: process.env.ELASTICSEARCH_URL ?? 'http://localhost:9200',
+  esApiKey: process.env.ELASTICSEARCH_API_KEY ?? '', // Elastic Cloud; Bonsai can use user:pass in the URL instead
   jwtSecret: process.env.JWT_SECRET ?? 'dev-secret',
   encryptionKey: process.env.ENCRYPTION_KEY ?? '0123456789abcdef0123456789abcdef',
   google: { clientId: process.env.GOOGLE_CLIENT_ID ?? '', clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '' },
