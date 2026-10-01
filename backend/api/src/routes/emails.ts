@@ -1,5 +1,6 @@
 import { Router } from 'express';
-import { EMAIL_INDEX, es, prisma } from '@ejs/core';
+import { z } from 'zod';
+import { EMAIL_INDEX, emailQueue, es, prisma } from '@ejs/core';
 import { uid } from '../auth';
 
 export const emailsRouter = Router();
@@ -88,6 +89,43 @@ emailsRouter.get('/search', async (req, res) => {
     });
     res.json(rows.map(shape));
   }
+});
+
+const deleteSchema = z.object({ ids: z.array(z.string()).min(1).max(500) });
+
+/**
+ * Bulk delete. Scheduled emails are also removed from the BullMQ queue so they never send.
+ * Rows currently being sent are skipped (they are already on the wire).
+ */
+emailsRouter.delete('/', async (req, res) => {
+  const userId = uid(req);
+  const { ids } = deleteSchema.parse(req.body);
+  const rows = await prisma.email.findMany({
+    where: { id: { in: ids }, campaign: { userId } },
+    select: { id: true, campaignId: true, status: true, idempotencyKey: true },
+  });
+  const deletable = rows.filter((r) => r.status !== 'sending');
+
+  await Promise.all(
+    deletable.map(async (r) => {
+      try {
+        await (await emailQueue.getJob(r.idempotencyKey))?.remove();
+      } catch {
+        // job was just picked up by a worker; the worker drops it when the row is gone
+      }
+    }),
+  );
+  const deletedIds = deletable.map((r) => r.id);
+  await prisma.email.deleteMany({ where: { id: { in: deletedIds } } });
+
+  // Tidy up campaigns that no longer have any emails.
+  const campaignIds = [...new Set(deletable.map((r) => r.campaignId))];
+  const stillUsed = await prisma.email.groupBy({ by: ['campaignId'], where: { campaignId: { in: campaignIds } } });
+  const used = new Set(stillUsed.map((g) => g.campaignId));
+  await prisma.campaign.deleteMany({ where: { id: { in: campaignIds.filter((c) => !used.has(c)) }, userId } });
+
+  void es.deleteByQuery({ index: EMAIL_INDEX, query: { ids: { values: deletedIds } } }).catch(() => undefined);
+  res.json({ deleted: deletedIds.length, skipped: ids.length - deletedIds.length });
 });
 
 emailsRouter.get('/:id', async (req, res) => {

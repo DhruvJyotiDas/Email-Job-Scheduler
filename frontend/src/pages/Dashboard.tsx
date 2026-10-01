@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Clock, Filter, RefreshCw, Search, Star } from 'lucide-react';
+import { Clock, Filter, RefreshCw, Search, Star, Trash2 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 import { api, EmailRow } from '../lib/api';
+import { useToast } from '../lib/toast';
 
 const FILTERS: Record<'scheduled' | 'sent', { value: string; label: string }[]> = {
   scheduled: [
@@ -48,12 +49,15 @@ function Skeleton() {
 export default function Dashboard({ tab }: { tab: 'scheduled' | 'sent' }) {
   const nav = useNavigate();
   const qc = useQueryClient();
+  const toast = useToast();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [q, setQ] = useState('');
   const [debounced, setDebounced] = useState('');
   const [filter, setFilter] = useState('all');
   const [filterOpen, setFilterOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
   useEffect(() => setFilter('all'), [tab]);
+  useEffect(() => setSelected(new Set()), [tab, filter, q]);
   useEffect(() => {
     const close = (e: MouseEvent) => { if (!filterRef.current?.contains(e.target as Node)) setFilterOpen(false); };
     document.addEventListener('mousedown', close);
@@ -70,11 +74,33 @@ export default function Dashboard({ tab }: { tab: 'scheduled' | 'sent' }) {
     queryFn: () =>
       debounced
         ? api<EmailRow[]>(`/api/emails/search?tab=${tab}&q=${encodeURIComponent(debounced)}`)
-        : api<EmailRow[]>(`/api/emails?tab=${tab}`),
+        : api<EmailRow[]>(`/api/emails?tab=${tab}&limit=200`),
   });
 
   const rows = data?.filter((e) => filter === 'all' || (filter === 'starred' ? e.starred : e.status === filter));
   const refresh = () => qc.invalidateQueries();
+
+  const allSelected = !!rows?.length && rows.every((e) => selected.has(e.id));
+  const toggle = (id: string) =>
+    setSelected((s) => {
+      const n = new Set(s);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(rows?.map((e) => e.id)));
+
+  const remove = useMutation({
+    mutationFn: (ids: string[]) => api<{ deleted: number; skipped: number }>('/api/emails', { method: 'DELETE', body: JSON.stringify({ ids }) }),
+    onSuccess: (r) => {
+      setSelected(new Set());
+      qc.invalidateQueries();
+      toast(`Deleted ${r.deleted} email(s)${r.skipped ? ` (${r.skipped} skipped, currently sending)` : ''}`);
+    },
+    onError: (e: Error) => toast(e.message, 'err'),
+  });
+  const confirmDelete = () => {
+    if (window.confirm(`Delete ${selected.size} email(s)? Scheduled emails will not be sent.`)) remove.mutate([...selected]);
+  };
 
   const star = useMutation({
     mutationFn: (id: string) => api(`/api/emails/${id}/star`, { method: 'PATCH' }),
@@ -84,6 +110,15 @@ export default function Dashboard({ tab }: { tab: 'scheduled' | 'sent' }) {
   return (
     <div>
       <div className="flex items-center gap-3 p-4">
+        <input
+          type="checkbox"
+          aria-label="Select all"
+          title="Select all"
+          checked={allSelected}
+          onChange={toggleAll}
+          disabled={!rows?.length}
+          className="h-4 w-4 cursor-pointer accent-brand"
+        />
         <div className="relative flex-1">
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
           <input
@@ -117,6 +152,16 @@ export default function Dashboard({ tab }: { tab: 'scheduled' | 'sent' }) {
         </button>
       </div>
 
+      {selected.size > 0 && (
+        <div className="mx-4 mb-2 flex items-center gap-3 rounded-lg bg-brand-tint px-3 py-2 text-xs">
+          <span className="font-medium">{selected.size} selected</span>
+          <button onClick={confirmDelete} disabled={remove.isPending} className="flex items-center gap-1 rounded-md bg-red-600 px-2.5 py-1 text-white disabled:opacity-60">
+            <Trash2 size={12} /> {remove.isPending ? 'Deleting…' : 'Delete'}
+          </button>
+          <button onClick={() => setSelected(new Set())} className="text-ink-muted hover:underline">Clear</button>
+        </div>
+      )}
+
       {isLoading ? (
         <Skeleton />
       ) : isError ? (
@@ -133,6 +178,14 @@ export default function Dashboard({ tab }: { tab: 'scheduled' | 'sent' }) {
               onClick={() => nav(`/email/${e.id}`)}
               className="flex cursor-pointer items-center gap-3 border-b border-line px-4 py-2.5 hover:bg-field/60"
             >
+              <input
+                type="checkbox"
+                aria-label="Select email"
+                checked={selected.has(e.id)}
+                onClick={(ev) => ev.stopPropagation()}
+                onChange={() => toggle(e.id)}
+                className="h-4 w-4 shrink-0 cursor-pointer accent-brand"
+              />
               <span className="w-[170px] shrink-0 truncate text-xs" dangerouslySetInnerHTML={{ __html: `To: ${e.highlight?.recipient?.[0] ? sanitizeHighlight(e.highlight.recipient[0]) : esc(e.recipient)}` }} />
               <Badge e={e} />
               <span className="min-w-0 flex-1 truncate text-xs">
