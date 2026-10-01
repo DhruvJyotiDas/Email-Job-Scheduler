@@ -66,7 +66,7 @@ export default function Dashboard({ tab }: { tab: 'scheduled' | 'sent' }) {
 
   const { data, isLoading, isError, isFetching } = useQuery({
     queryKey: ['emails', tab, debounced],
-    refetchInterval: 5000, // fallback when the live socket is unavailable behind a proxy
+    refetchInterval: 5000,
     queryFn: () =>
       debounced
         ? api<EmailRow[]>(`/api/emails/search?tab=${tab}&q=${encodeURIComponent(debounced)}`)

@@ -3,7 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BarChart3, ChevronDown, Clock, FlaskConical, LogOut, Send, Users, Slack } from 'lucide-react';
 import { api, Me } from '../lib/api';
-import { useEmailEvents } from '../lib/useEmailEvents';
+import { useEmailUpdates } from '../lib/useEmailUpdates';
 import { useToast } from '../lib/toast';
 
 export function Logo() {
@@ -24,7 +24,6 @@ const navCls = ({ isActive }: { isActive: boolean }) =>
   `flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${isActive ? 'bg-brand-tint font-medium' : 'hover:bg-field'}`;
 
 export default function Layout({ me }: { me: Me }) {
-  useEmailEvents();
   const nav = useNavigate();
   const qc = useQueryClient();
   const toast = useToast();
@@ -40,6 +39,7 @@ export default function Layout({ me }: { me: Me }) {
     onError: (e: Error) => toast(e.message, 'err'),
   });
   const { data: counts } = useQuery({ queryKey: ['counts'], refetchInterval: 5000, queryFn: () => api<{ scheduled: number; sent: number }>('/api/emails/counts') });
+  useEmailUpdates(counts);
 
   const logout = async () => {
     await api('/api/auth/logout', { method: 'POST' });

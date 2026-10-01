@@ -21,20 +21,19 @@ sendersRouter.get('/', async (req, res) => {
 /** Provision a fresh Ethereal SMTP account and register it as a sender. */
 sendersRouter.post('/ethereal', async (req, res) => {
   const userId = uid(req);
-  let acct;
   try {
-    acct = await nodemailer.createTestAccount();
+    const acct = await nodemailer.createTestAccount();
+    const s = await prisma.sender.create({
+      data: {
+        userId, email: acct.user, etherealUser: acct.user, etherealPassEnc: encrypt(acct.pass),
+        hourlyLimit: Number(req.body?.hourlyLimit ?? config.maxEmailsPerHourPerSender),
+      },
+    });
+    res.status(201).json({ id: s.id, email: s.email, hourlyLimit: s.hourlyLimit });
   } catch (err) {
-    req.log.error({ err }, 'ethereal account creation failed');
-    return void res.status(502).json({ error: `Could not reach Ethereal: ${(err as Error).message}` });
+    req.log.error({ err }, 'ethereal sender creation failed');
+    res.status(502).json({ error: `Could not create sender: ${(err as Error).message}` });
   }
-  const s = await prisma.sender.create({
-    data: {
-      userId, email: acct.user, etherealUser: acct.user, etherealPassEnc: encrypt(acct.pass),
-      hourlyLimit: Number(req.body?.hourlyLimit ?? config.maxEmailsPerHourPerSender),
-    },
-  });
-  res.status(201).json({ id: s.id, email: s.email, hourlyLimit: s.hourlyLimit });
 });
 
 sendersRouter.patch('/:id', async (req, res) => {

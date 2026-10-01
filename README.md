@@ -47,7 +47,7 @@ Made by **[Dhruv Jyoti Das](https://github.com/DhruvJyotiDas)** · Built for the
 | ✨ | **AI compose (Gemini)** | One click → subject + body. Cached, capped output, per-user daily budget, fallback model. |
 | 🧪 | **Spam score** | Free, local heuristic linter with a live badge and fix hints. |
 | 🧩 | **Spintax + variables** | `{Hi\|Hello} {{firstName}}`, CSV columns become variables. |
-| ⚡ | **Live UI** | Worker → Redis pub/sub → socket.io; rows flip to *sent* with toasts. |
+| ⚡ | **Live UI** | The dashboard polls every 5 s; rows flip to *sent* with toasts. |
 | 📊 | **Analytics** | Queue depth, success rate, sent/hour (24 h), per-sender usage. |
 | 🚫 | **Suppression list** | Opted-out recipients are skipped inside the worker. |
 | 🔔 | **Slack alerts** | Real OAuth; one alert per sender per hour window when a limit is hit. |
@@ -69,9 +69,6 @@ flowchart LR
   W -->|"status"| PG
   W -->|"index"| ES[("Elasticsearch")]
   W -->|"rate-limit alert"| S["Slack"]
-  W -->|"publish events"| R
-  R -->|"pub/sub"| API
-  API -->|"socket.io"| UI
   API -->|"generate draft"| G["Gemini"]
 ```
 
@@ -93,7 +90,7 @@ sequenceDiagram
   Note over Q: job waits in Redis until its time
   Q->>W: job becomes due
   W->>DB: load email, send, mark sent
-  W-->>UI: live update via pub/sub and socket.io
+  UI->>API: polls counts and lists every 5 s, rows flip to sent
 ```
 
 ### Send path (per job)
@@ -215,7 +212,7 @@ The essentials in `.env` (see [Configuration](#️-configuration) for all of the
 | `ELASTICSEARCH_URL` / `ELASTICSEARCH_API_KEY` | `http://localhost:9200` | The API key is only needed for Elastic Cloud |
 
 ### Hosting on Render
-See [render.yaml](render.yaml): one Postgres, one Redis (`noeviction`), an API web service, a background worker, and a static site that proxies `/api` and `/socket.io` to the API.
+See [render.yaml](render.yaml): one Postgres, one Redis (`noeviction`), an API web service, a background worker, and a static site that proxies `/api` to the API.
 
 ## ✅ Features implemented
 
@@ -243,7 +240,7 @@ See [render.yaml](render.yaml): one Postgres, one Redis (`noeviction`), an API w
 | **Dashboard** | Scheduled and Sent tabs, search, Compose button. |
 | **Compose** | Subject, rich body, CSV upload with detected email count, start time, delay, hourly limit, Schedule. |
 | **Tables** | Email, subject, scheduled or sent time, status. Loading, empty and error states. |
-| **Live updates** | socket.io: rows flip to *sent* with toasts. |
+| **Live updates** | Polling every 5 s: rows flip to *sent* with toasts. |
 | **Code quality** | TypeScript types for API and props, reusable components, shared zod schemas. |
 
 ## ⚙️ Configuration
@@ -271,7 +268,7 @@ from a 24 h Redis cache · per-user daily budget · the spam checker is local an
 - **Elasticsearch is best-effort.** Indexing is fire-and-forget; Postgres is the source of truth and search falls back to it. Emails created before Elasticsearch was connected are not back-filled.
 - **Ethereal is a test SMTP.** Mail never reaches real inboxes; each sent email has a preview URL instead.
 - **Auth:** Google OAuth with an httpOnly cookie JWT. The email/password fields on the login screen match the Figma but are not wired; the dev-login shortcut is disabled in production.
-- **Hosting on Render:** the static site proxies `/api` and `/socket.io` to the API so the cookie session is same-origin. WebSocket upgrades through that proxy are not guaranteed, so live updates may fall back to polling.
+- **Hosting on Render:** the static site proxies `/api` to the API so the cookie session is same-origin. Render's static-site proxy can't carry WebSockets, so the UI polls every 5 s instead of using socket.io.
 - **Migrations run in the build step** on Render (pre-deploy hooks are a paid feature).
 - **Not built:** email attachments, a k6 load script, production docker-compose with HTTPS.
 
@@ -297,7 +294,7 @@ from a 24 h Redis cache · per-user daily budget · the spam checker is local an
 │       └── lib/             api client · auth · toasts · live email events
 │
 ├── backend/
-│   ├── api/                 Express API · auth · Bull Board · Swagger · socket.io  (@ejs/api)
+│   ├── api/                 Express API · auth · Bull Board · Swagger  (@ejs/api)
 │   │   └── src/routes/      campaigns · emails · senders · slack · ai · stats
 │   ├── worker/              BullMQ worker  (@ejs/worker)
 │   │   └── src/             processor.ts (limiter, rotation, CAS, SMTP) · mailer.ts
