@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { BarChart3, ChevronDown, Clock, LogOut, Send, Users, Slack } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { BarChart3, ChevronDown, Clock, FlaskConical, LogOut, Send, Users, Slack } from 'lucide-react';
 import { api, Me } from '../lib/api';
 import { useEmailEvents } from '../lib/useEmailEvents';
+import { useToast } from '../lib/toast';
 
 export function Logo() {
   return <span className="font-pixel text-[26px] leading-none tracking-tight">ONB</span>;
@@ -26,7 +27,18 @@ export default function Layout({ me }: { me: Me }) {
   useEmailEvents();
   const nav = useNavigate();
   const qc = useQueryClient();
+  const toast = useToast();
   const [menu, setMenu] = useState(false);
+  const loadDemo = useMutation({
+    mutationFn: (mode?: 'ratelimit') =>
+      api<{ created: { total: number }[] }>(`/api/demo${mode ? `?mode=${mode}` : ''}`, { method: 'POST' }),
+    onSuccess: (r) => {
+      qc.invalidateQueries();
+      toast(`Loaded ${r.created.reduce((n, c) => n + c.total, 0)} demo emails`);
+      nav('/scheduled');
+    },
+    onError: (e: Error) => toast(e.message, 'err'),
+  });
   const { data: counts } = useQuery({ queryKey: ['counts'], queryFn: () => api<{ scheduled: number; sent: number }>('/api/emails/counts') });
 
   const logout = async () => {
@@ -61,6 +73,24 @@ export default function Layout({ me }: { me: Me }) {
           )}
         </div>
         <button onClick={() => nav('/compose')} className="btn-outline mt-4 w-full">Compose</button>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <button
+            onClick={() => loadDemo.mutate(undefined)}
+            disabled={loadDemo.isPending}
+            title="Add sample campaigns: one sends now, one stays scheduled for the restart demo"
+            className="flex items-center justify-center gap-1 rounded-lg bg-field py-1.5 text-[11px] hover:bg-line disabled:opacity-60"
+          >
+            <FlaskConical size={12} /> {loadDemo.isPending ? 'Loading…' : 'Demo data'}
+          </button>
+          <button
+            onClick={() => loadDemo.mutate('ratelimit')}
+            disabled={loadDemo.isPending}
+            title="15 emails with an hourly limit of 3: shows rescheduling and the Slack alert"
+            className="flex items-center justify-center gap-1 rounded-lg bg-field py-1.5 text-[11px] hover:bg-line disabled:opacity-60"
+          >
+            <FlaskConical size={12} /> Rate limit
+          </button>
+        </div>
         <div className="mb-2 mt-6 px-3 text-[10px] font-medium uppercase tracking-wider text-ink-muted">Core</div>
         <nav className="space-y-1">
           <NavLink to="/scheduled" className={navCls}>

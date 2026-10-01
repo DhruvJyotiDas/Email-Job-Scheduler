@@ -2,6 +2,10 @@
 
 ## 1. Load demo emails into your account
 
+**Easiest: use the in-app buttons.** In the left sidebar under **Compose**, click **Demo data** (a welcome campaign that sends in ~10 s and a launch campaign scheduled ~5 min ahead) or **Rate limit** (15 emails, hourly limit 3, triggers rescheduling and the Slack alert). It works for any account, new or old, and also creates 3 Ethereal senders if you have none.
+
+Or, from the terminal:
+
 Log in to the app once with Google (this creates your user), then run from the repo root:
 
 ```bash

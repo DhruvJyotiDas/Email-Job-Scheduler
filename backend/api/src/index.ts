@@ -19,6 +19,7 @@ import { campaignsRouter } from './routes/campaigns';
 import { emailsRouter } from './routes/emails';
 import { sendersRouter, suppressionsRouter } from './routes/senders';
 import { slackRouter } from './routes/slack';
+import { demoRouter } from './routes/demo';
 import { aiRouter } from './routes/ai';
 import { statsRouter } from './routes/stats';
 import { openapi } from './swagger';
@@ -78,6 +79,7 @@ app.use('/api/emails', apiLimiter, requireAuth, emailsRouter);
 app.use('/api/senders', apiLimiter, requireAuth, sendersRouter);
 app.use('/api/suppressions', apiLimiter, requireAuth, suppressionsRouter);
 app.use('/api/ai', apiLimiter, requireAuth, aiRouter);
+app.use('/api/demo', apiLimiter, requireAuth, demoRouter);
 app.use('/api/stats', apiLimiter, requireAuth, statsRouter);
 
 const boardAdapter = new ExpressAdapter();

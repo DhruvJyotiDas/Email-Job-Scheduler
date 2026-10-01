@@ -16,19 +16,24 @@ const campaignIdFor = (userId: string, b: ReturnType<typeof createCampaignSchema
     .digest('hex')
     .slice(0, 24);
 
-campaignsRouter.post('/', async (req, res) => {
-  const userId = uid(req);
-  const body = createCampaignSchema.parse(req.body);
+export type CreateCampaignInput = ReturnType<typeof createCampaignSchema.parse>;
+export interface CreateCampaignResult {
+  status: number;
+  payload: Record<string, unknown>;
+}
+
+/** Shared by the REST route and the in-app demo loader: persist the campaign, then enqueue one delayed job per email. */
+export async function createCampaign(userId: string, body: CreateCampaignInput, requestId?: string): Promise<CreateCampaignResult> {
   const id = campaignIdFor(userId, body);
 
   const existing = await prisma.campaign.findUnique({ where: { id }, include: { _count: { select: { emails: true } } } });
-  if (existing) return void res.status(200).json({ id, total: existing._count.emails, duplicate: true });
+  if (existing) return { status: 200, payload: { id, total: existing._count.emails, duplicate: true } };
 
   // Per-user daily enqueue quota — prevents one account from flooding the queue.
   const quotaKey = `quota:${userId}:${new Date().toISOString().slice(0, 10)}`;
   const current = Number((await redis.get(quotaKey)) ?? 0);
   if (current + body.recipients.length > config.dailyEmailLimitPerUser) {
-    return void res.status(429).json({ error: 'daily_quota_exceeded', limit: config.dailyEmailLimitPerUser });
+    return { status: 429, payload: { error: 'daily_quota_exceeded', limit: config.dailyEmailLimitPerUser } };
   }
 
   const startAt = new Date(body.startAt);
@@ -60,7 +65,6 @@ campaignsRouter.post('/', async (req, res) => {
   ]);
 
   const created = await prisma.email.findMany({ where: { campaignId: id }, select: { id: true, idempotencyKey: true, scheduledAt: true } });
-  const requestId = (req as any).id as string | undefined;
   await emailQueue.addBulk(
     created.map((e) => ({
       name: 'send-email',
@@ -73,7 +77,12 @@ campaignsRouter.post('/', async (req, res) => {
   await redis.expire(quotaKey, 86400 * 2);
   void Promise.all(created.map((e) => indexEmail(e.id)));
 
-  res.status(201).json({ id, total: created.length, duplicate: false });
+  return { status: 201, payload: { id, total: created.length, duplicate: false } };
+}
+
+campaignsRouter.post('/', async (req, res) => {
+  const result = await createCampaign(uid(req), createCampaignSchema.parse(req.body), (req as any).id as string | undefined);
+  res.status(result.status).json(result.payload);
 });
 
 campaignsRouter.get('/:id', async (req, res) => {
