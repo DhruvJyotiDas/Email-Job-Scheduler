@@ -18,11 +18,42 @@ sendersRouter.get('/', async (req, res) => {
   );
 });
 
-/** Provision a fresh Ethereal SMTP account and register it as a sender. */
+/** Fail fast if the API/worker host cannot actually reach Ethereal's SMTP port. */
+async function verifySmtp(user: string, pass: string) {
+  const transport = nodemailer.createTransport({
+    host: 'smtp.ethereal.email',
+    port: 587,
+    secure: false,
+    auth: { user, pass },
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+  });
+  await transport.verify();
+}
+
+/**
+ * Register an Ethereal SMTP sender. With { user, pass } it uses the credentials you created at https://ethereal.email/create;
+ * with no body it provisions a fresh account. Either way the SMTP login is verified so a blocked port or bad password
+ * is reported now instead of emails silently never sending.
+ */
 sendersRouter.post('/ethereal', async (req, res) => {
   const userId = uid(req);
+  let acct: { user: string; pass: string };
   try {
-    const acct = await nodemailer.createTestAccount();
+    acct = req.body?.user && req.body?.pass
+      ? { user: String(req.body.user).trim(), pass: String(req.body.pass) }
+      : await nodemailer.createTestAccount();
+  } catch (err) {
+    req.log.error({ err }, 'ethereal account creation failed');
+    return void res.status(502).json({ error: `Could not create an Ethereal account from the server: ${(err as Error).message}` });
+  }
+  try {
+    await verifySmtp(acct.user, acct.pass);
+  } catch (err) {
+    req.log.error({ err }, 'ethereal smtp verify failed');
+    return void res.status(502).json({ error: `Could not log in to smtp.ethereal.email:587 (${(err as Error).message})` });
+  }
+  try {
     const s = await prisma.sender.create({
       data: {
         userId, email: acct.user, etherealUser: acct.user, etherealPassEnc: encrypt(acct.pass),
@@ -31,8 +62,8 @@ sendersRouter.post('/ethereal', async (req, res) => {
     });
     res.status(201).json({ id: s.id, email: s.email, hourlyLimit: s.hourlyLimit });
   } catch (err) {
-    req.log.error({ err }, 'ethereal sender creation failed');
-    res.status(502).json({ error: `Could not create sender: ${(err as Error).message}` });
+    req.log.error({ err }, 'sender save failed');
+    res.status(500).json({ error: `Could not save sender: ${(err as Error).message}` });
   }
 });
 
