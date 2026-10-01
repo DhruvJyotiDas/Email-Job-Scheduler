@@ -14,8 +14,11 @@ export default function Senders() {
   const [pass, setPass] = useState('');
 
   const add = useMutation({
-    mutationFn: (creds?: { user: string; pass: string }) => api('/api/senders/ethereal', { method: 'POST', body: JSON.stringify(creds ?? {}) }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['senders'] }); toast('Ethereal sender added'); setManual(false); setUser(''); setPass(''); },
+    mutationFn: (creds?: { user: string; pass: string }) => api<{ smtpWarning?: string }>('/api/senders/ethereal', { method: 'POST', body: JSON.stringify(creds ?? {}) }),
+    onSuccess: (r) => {
+      qc.invalidateQueries({ queryKey: ['senders'] });
+      toast(r.smtpWarning ? `Sender added. The API could not reach SMTP (${r.smtpWarning}); the worker will try when sending.` : 'Ethereal sender added');
+      setManual(false); setUser(''); setPass(''); },
     onError: (e: Error) => toast(e.message, 'err'),
   });
   const toggle = useMutation({

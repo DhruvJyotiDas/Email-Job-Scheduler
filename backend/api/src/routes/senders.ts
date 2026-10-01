@@ -18,23 +18,23 @@ sendersRouter.get('/', async (req, res) => {
   );
 });
 
-/** Fail fast if the API/worker host cannot actually reach Ethereal's SMTP port. */
+/** Check the SMTP login. Informational only: the API may run on a plan that blocks outbound SMTP while the worker does not. */
 async function verifySmtp(user: string, pass: string) {
   const transport = nodemailer.createTransport({
     host: 'smtp.ethereal.email',
     port: 587,
     secure: false,
     auth: { user, pass },
-    connectionTimeout: 10_000,
-    greetingTimeout: 10_000,
+    connectionTimeout: 6_000,
+    greetingTimeout: 6_000,
   });
   await transport.verify();
 }
 
 /**
  * Register an Ethereal SMTP sender. With { user, pass } it uses the credentials you created at https://ethereal.email/create;
- * with no body it provisions a fresh account. Either way the SMTP login is verified so a blocked port or bad password
- * is reported now instead of emails silently never sending.
+ * with no body it provisions a fresh account. The SMTP login is checked and a warning is returned when it can't be
+ * reached from the API host (e.g. Render's free web services block port 587); the worker does the real sending.
  */
 sendersRouter.post('/ethereal', async (req, res) => {
   const userId = uid(req);
@@ -47,11 +47,12 @@ sendersRouter.post('/ethereal', async (req, res) => {
     req.log.error({ err }, 'ethereal account creation failed');
     return void res.status(502).json({ error: `Could not create an Ethereal account from the server: ${(err as Error).message}` });
   }
+  let smtpWarning: string | undefined;
   try {
     await verifySmtp(acct.user, acct.pass);
   } catch (err) {
-    req.log.error({ err }, 'ethereal smtp verify failed');
-    return void res.status(502).json({ error: `Could not log in to smtp.ethereal.email:587 (${(err as Error).message})` });
+    req.log.warn({ err }, 'ethereal smtp verify failed from API host');
+    smtpWarning = (err as Error).message;
   }
   try {
     const s = await prisma.sender.create({
@@ -60,7 +61,7 @@ sendersRouter.post('/ethereal', async (req, res) => {
         hourlyLimit: Number(req.body?.hourlyLimit ?? config.maxEmailsPerHourPerSender),
       },
     });
-    res.status(201).json({ id: s.id, email: s.email, hourlyLimit: s.hourlyLimit });
+    res.status(201).json({ id: s.id, email: s.email, hourlyLimit: s.hourlyLimit, smtpWarning });
   } catch (err) {
     req.log.error({ err }, 'sender save failed');
     res.status(500).json({ error: `Could not save sender: ${(err as Error).message}` });
