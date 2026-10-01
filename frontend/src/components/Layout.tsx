@@ -28,6 +28,11 @@ export default function Layout({ me }: { me: Me }) {
   const qc = useQueryClient();
   const toast = useToast();
   const [menu, setMenu] = useState(false);
+  const testSlack = useMutation({
+    mutationFn: () => api<{ sent: boolean }>('/api/slack/test', { method: 'POST' }),
+    onSuccess: () => toast('Test alert sent to Slack'),
+    onError: (e: Error) => toast(`Slack test failed: ${e.message}`, 'err'),
+  });
   const loadDemo = useMutation({
     mutationFn: (mode?: 'ratelimit') =>
       api<{ created: { total: number }[] }>(`/api/demo${mode ? `?mode=${mode}` : ''}`, { method: 'POST' }),
@@ -63,7 +68,12 @@ export default function Layout({ me }: { me: Me }) {
           {menu && (
             <div className="absolute left-0 right-0 z-10 mt-1 rounded-lg border border-line bg-white p-1 shadow-lg">
               {me.slackConnected ? (
-                <div className="flex items-center gap-2 px-3 py-2 text-xs text-brand"><Slack size={13} /> Slack connected</div>
+                <>
+                  <div className="flex items-center gap-2 px-3 py-2 text-xs text-brand"><Slack size={13} /> Slack connected</div>
+                  <button onClick={() => testSlack.mutate()} disabled={testSlack.isPending} className="block w-full rounded px-3 py-2 text-left text-xs hover:bg-field">
+                    {testSlack.isPending ? 'Sending…' : 'Send test alert'}
+                  </button>
+                </>
               ) : (
                 <a href="/api/slack/connect" className="flex items-center gap-2 rounded px-3 py-2 text-xs hover:bg-field"><Slack size={13} /> Connect Slack</a>
               )}

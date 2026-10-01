@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
-import { config, encrypt, postSlack, prisma } from '@ejs/core';
+import { config, encrypt, postSlack, postSlackResult, prisma } from '@ejs/core';
 import { requireAuth, uid } from '../auth';
 
 export const slackRouter = Router();
@@ -52,8 +52,8 @@ slackRouter.get('/callback', async (req, res) => {
 });
 
 slackRouter.post('/test', requireAuth, async (req, res) => {
-  const ok = await postSlack(uid(req), ':bell: Test alert from Email Job Scheduler');
-  res.status(ok ? 200 : 409).json({ sent: ok });
+  const r = await postSlackResult(uid(req), ':bell: Test alert from Email Job Scheduler');
+  res.status(r.ok ? 200 : 409).json({ sent: r.ok, error: r.error });
 });
 
 slackRouter.delete('/', requireAuth, async (req, res) => {
