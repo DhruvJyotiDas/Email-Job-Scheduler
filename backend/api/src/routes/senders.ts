@@ -55,11 +55,12 @@ sendersRouter.post('/ethereal', async (req, res) => {
     smtpWarning = (err as Error).message;
   }
   try {
-    const s = await prisma.sender.create({
-      data: {
-        userId, email: acct.user, etherealUser: acct.user, etherealPassEnc: encrypt(acct.pass),
-        hourlyLimit: Number(req.body?.hourlyLimit ?? config.maxEmailsPerHourPerSender),
-      },
+    const hourlyLimit = Number(req.body?.hourlyLimit ?? config.maxEmailsPerHourPerSender);
+    // Re-adding the same Ethereal login updates its password and re-activates it instead of failing.
+    const s = await prisma.sender.upsert({
+      where: { userId_email: { userId, email: acct.user } },
+      update: { etherealUser: acct.user, etherealPassEnc: encrypt(acct.pass), isActive: true },
+      create: { userId, email: acct.user, etherealUser: acct.user, etherealPassEnc: encrypt(acct.pass), hourlyLimit },
     });
     res.status(201).json({ id: s.id, email: s.email, hourlyLimit: s.hourlyLimit, smtpWarning });
   } catch (err) {
