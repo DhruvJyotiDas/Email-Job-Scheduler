@@ -145,7 +145,7 @@ services:
         value: info
 
   # ── Frontend (Static Site) ─────────────────────────────────────────────────
-  # The SPA calls relative paths (/api, /socket.io) and uses a cookie session, so the
+  # The SPA calls relative paths (/api, /admin) and uses a cookie session, so the
   # static site proxies those paths to the API via rewrite rules (same-origin => cookies work).
   # After creating ejs-api, replace ejs-api.onrender.com below with its real URL if it differs.
   - type: web
@@ -163,9 +163,10 @@ services:
       - type: rewrite
         source: /api/*
         destination: https://ejs-api.onrender.com/api/*
+      # Bull Board (queue dashboard). Needs the login cookie, so it must be served from the site's own domain.
       - type: rewrite
-        source: /socket.io/*
-        destination: https://ejs-api.onrender.com/socket.io/*
+        source: /admin/*
+        destination: https://ejs-api.onrender.com/admin/*
       # Catch-all — serve index.html for client-side routing.
       - type: rewrite
         source: /*
