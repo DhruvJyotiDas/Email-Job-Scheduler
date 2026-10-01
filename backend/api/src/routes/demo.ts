@@ -58,7 +58,12 @@ const rateLimit: CreateCampaignInput = {
  */
 demoRouter.post('/', async (req, res) => {
   const userId = uid(req);
-  await ensureSenders(userId);
+  try {
+    await ensureSenders(userId);
+  } catch (err) {
+    req.log.error({ err }, 'demo: could not create Ethereal senders');
+    return void res.status(502).json({ error: `Could not create Ethereal sender accounts: ${(err as Error).message}` });
+  }
 
   const plan =
     req.query.mode === 'ratelimit'

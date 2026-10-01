@@ -39,7 +39,7 @@ export default function Layout({ me }: { me: Me }) {
     },
     onError: (e: Error) => toast(e.message, 'err'),
   });
-  const { data: counts } = useQuery({ queryKey: ['counts'], queryFn: () => api<{ scheduled: number; sent: number }>('/api/emails/counts') });
+  const { data: counts } = useQuery({ queryKey: ['counts'], refetchInterval: 5000, queryFn: () => api<{ scheduled: number; sent: number }>('/api/emails/counts') });
 
   const logout = async () => {
     await api('/api/auth/logout', { method: 'POST' });
