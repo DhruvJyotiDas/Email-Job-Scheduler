@@ -16,5 +16,5 @@
     "ioredis": "^5.4.0",
     "pino": "^9.6.0"
   },
-  "devDependencies": { "vitest": "^2.1.0" }
+  "devDependencies": { "vitest": "^5.0.2" }
 }
