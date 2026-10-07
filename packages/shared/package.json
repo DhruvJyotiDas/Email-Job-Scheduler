@@ -8,6 +8,6 @@
     "typecheck": "tsc -p . --noEmit",
     "test": "vitest run"
   },
-  "dependencies": { "zod": "^3.24.0" },
+  "dependencies": { "zod": "^4.6.5" },
   "devDependencies": { "vitest": "^2.1.0" }
 }
